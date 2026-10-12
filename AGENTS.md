@@ -14,7 +14,8 @@ real hardware.
 | `app/render-states.py` | renders the device app offscreen through the real SDK for preview |
 | `build.sh` | assembles the device app with the client's install disk; `deploy <host>` copies to the KVM |
 
-The Mac client is built in a separate repository and arrives here only as `mac-client.iso`; see `build.sh`.
+The Mac client is built in a separate repository and arrives here only as `mac-client.iso`: a release pinned
+in `client.env`, which the client's CI moves with a pull request. See `build.sh` and `.github/workflows/`.
 
 ## Invariants
 

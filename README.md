@@ -58,11 +58,11 @@ restores the stock library; removing the app directory removes the rest.
 
 ## Building
 
-- Shim, from `app/shim/`: `docker run --rm --platform linux/arm/v7 -v "$PWD":/src -w /src debian:trixie-slim sh -c
+- Shim, from `app/shim/`: `docker run --rm --platform linux/arm/v7 -v "$PWD":/src -w /src debian:trixie-20260918-slim sh -c
   'apt-get -qq update && apt-get -qq install -y gcc libc6-dev && gcc -O2 -shared -fPIC -Wl,-soname,libkvm.so.0 -o libkvm.so libkvm_shim.c -ldl -lpthread'`
 - Shim self-check (native), from `app/shim/`: `cc -O1 -o test_shim test_shim.c -lpthread && ./test_shim test.h264 test.h265 test_vt.h264`
-- Device app: `./build.sh [deploy <kvm-host>]`. It bundles the Mac client's install disk from
-  `SIDECAST_CLIENT_ISO`; the client is built separately and ships as a signed binary.
+- Device app: `./build.sh [deploy <kvm-host>]`. It bundles the Mac client release pinned in `client.env`
+  (signed and notarized, built in a separate repository), or a local build from `SIDECAST_CLIENT_ISO`.
 - Preview the device app without hardware: `app/render-states.py <appbase dir> app/sidecast <out dir>`.
 
 ## Limits
