@@ -1,0 +1,17 @@
+# build outputs
+/app/shim/libkvm.so
+/app/shim/test_shim
+/app/shim/bench_shim
+/build/
+
+# the Mac client: a checkout of its own repository
+/client/
+
+# vendor binaries pulled from the device for analysis (proprietary, never commit)
+/dev/
+
+# secrets
+*.p12
+*.p8
+*.certSigningRequest
+.DS_Store

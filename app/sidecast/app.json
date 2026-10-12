@@ -1,0 +1,9 @@
+{
+  "app_id": "de.tolunla.sidecast",
+  "name": "Sidecast",
+  "creator": "Teslim Olunlade",
+  "create_time": "2026-10-10",
+  "desc": "Stream a host with no free display output into this KVM. Installs the proxy shim and serves the host client as a USB disk.",
+  "category": "tools",
+  "icon": "icon.png"
+}

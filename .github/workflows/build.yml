@@ -1,0 +1,47 @@
+# Pushes to main and pull requests: shim self-check, ARM cross-build, device app compile check.
+# A vX.Y.Z tag (which must match version.toml) also puts the client release pinned there on the installer disk
+# and releases Sidecast-vX.Y.Z-nanokvm.zip as "Sidecast vX.Y.Z", with that version's CHANGELOG.md section as
+# notes: its first line names the supported nanokvm-go version.
+name: build
+on:
+  push: { branches: [main], tags: ['v*'] }
+  pull_request:
+permissions: { contents: write }
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Release notes from CHANGELOG.md (tags; fails before the build if the section is missing)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          V=${GITHUB_REF_NAME#v}
+          v() { sed -n "s/^$1 = \"\([^\"]*\)\".*/\1/p" version.toml; }
+          [ "$(v sidecast)" = "$V" ] || { echo "version.toml says sidecast $(v sidecast), the tag says $V"; exit 1; }
+          KVM=$(v nanokvm_go)
+          awk -v h="## [$V]" 'index($0, h) == 1 {f = 1; next} f && /^## / {exit} f' CHANGELOG.md > notes.md
+          grep -q . notes.md || { echo "CHANGELOG.md has no section for $V"; exit 1; }
+          grep -qF "\`nanokvm-go\` $KVM" notes.md || { echo "CHANGELOG.md $V must name nanokvm-go $KVM, as version.toml does"; exit 1; }
+      - name: Shim self-check
+        working-directory: app/shim
+        run: cc -O1 -o test_shim test_shim.c -lpthread && ./test_shim test.h264 test.h265 test_vt.h264
+      - name: Device app compiles
+        run: python3 -c 'import sys; [compile(open(f).read(), f, "exec") for f in sys.argv[1:]]' app/sidecast/*.py app/render-states.py   # in memory: no __pycache__ to ship
+      - uses: docker/setup-qemu-action@v4
+      - name: Shim (32-bit ARM; the image's glibc is the minimum the KVM needs, keep it pinned)
+        working-directory: app/shim
+        run: >-
+          docker run --rm --platform linux/arm/v7 -v "$PWD":/src -w /src debian:trixie-20260918-slim sh -c
+          'apt-get -qq update && apt-get -qq install -y gcc libc6-dev >/dev/null &&
+          gcc -O2 -shared -fPIC -Wl,-soname,libkvm.so.0 -o libkvm.so libkvm_shim.c -ldl -lpthread'
+      - name: Bundle and release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          sudo apt-get -qq update && sudo apt-get -qq install -y xorriso >/dev/null
+          ./build.sh | tee build.log
+          grep -q "^app version: ${GITHUB_REF_NAME#v} (" build.log   # a clean tagged build: no commit suffix
+          Z=Sidecast-$GITHUB_REF_NAME-nanokvm.zip
+          (cd build && zip -qr "../$Z" sidecast)
+          printf '\nInstaller disk: %s\n' "$(sed -n 's/^installer disk: //p' build.log)" >> notes.md
+          gh release create "$GITHUB_REF_NAME" "$Z" --title "Sidecast $GITHUB_REF_NAME" --notes-file notes.md
