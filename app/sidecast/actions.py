@@ -31,7 +31,10 @@ def kvm_version():
 
 def shim_on():
     if kvm_version() != KVM_VERSION: return False   # never load the shim into a server it was not built for
-    shutil.copy2(SHIM_SRC, SHIM)   # 72 KB, every time: no staleness check to get wrong
+    # 72 KB, every time: no staleness check to get wrong. Copied beside it and renamed in, never written in place: the
+    # server runs from hard links to these files (nanokvm_pre.sh re-links them at every start), so an in-place write
+    # would change the library under the running server before the restart.
+    shutil.copy2(SHIM_SRC, SHIM + ".tmp"); os.replace(SHIM + ".tmp", SHIM)
     os.symlink("libkvm.so.shim", LINK + ".tmp"); os.replace(LINK + ".tmp", LINK)
     return sh("systemctl", "restart", "nanokvm-go")
 
