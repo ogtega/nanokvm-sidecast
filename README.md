@@ -23,7 +23,7 @@ instead, over the USB network link the KVM already uses for keyboard and mouse. 
 usual, and the screen you work on is there.
 
 Any operating system can stream to Sidecast: the protocol is open and small. Every release ships a signed,
-notarized Mac app; on Linux or Windows, a few lines around ffmpeg will do (see
+notarized Mac app and a Windows app; on Linux, a few lines around ffmpeg will do (see
 [Write a client](#write-a-client)).
 
 ## Requirements
@@ -32,6 +32,7 @@ notarized Mac app; on Linux or Windows, a few lines around ffmpeg will do (see
 |---|---|
 | KVM | NanoKVM Go or Go+ running the `nanokvm-go` version named in the release (today: 0.2.2) |
 | Mac app | Apple silicon, macOS 13 or later |
+| Windows app | x64 or Arm, Windows 10 version 2004 or later, a hardware H.264 or H.265 encoder |
 | Other systems | any client that follows [the protocol](docs/protocol.md) |
 | Link | the USB-C cable between the computer and the KVM |
 
@@ -58,6 +59,13 @@ The Mac app adds:
 - **Wakes the displays** when you start viewing. Your input keeps them awake; the lock screen still asks for
   your password.
 - **No recording indicator** in the menu bar by default, and a low-CPU mode if you would rather have it.
+
+The Windows app adds:
+
+- **Any display, from the notification area.** Pick a display in its flyout. Windows sends the KVM's mouse only
+  to the primary display, so the display you pick becomes the primary while Sidecast runs, and the KVM's
+  pointer works there. Quitting puts your own layout back.
+- **Your PC's hardware encoder**, on x64 and on Arm, the way the Mac app uses the Mac's.
 
 ## On the KVM
 
@@ -114,6 +122,22 @@ One switch, one status line, and a button when there is something to do.
 
 Sidecast starts at login from then on and reconnects whenever the cable is plugged in.
 
+### Install on Windows
+
+4. Tap **GET CLIENT** on the KVM. A drive named "Sidecast" appears in File Explorer. It holds one installer
+   per platform: open `Sidecast-<version>-windows-x64.exe`, or `-windows-arm64.exe` on an Arm PC
+   (**Settings > System > About** shows which under **System type**).
+5. The installer needs no administrator rights and starts Sidecast in the notification area when it finishes.
+
+   > [!NOTE]
+   > The Windows app is not signed yet. If Windows says it protected your PC, choose **More info**, then
+   > **Run anyway**.
+
+6. Tap **EJECT DISK** on the KVM, then pick the display to stream from Sidecast's icon. Within a minute the
+   KVM's web UI shows it.
+
+Sidecast starts with Windows from then on and reconnects whenever the cable is plugged in.
+
 ### Updating
 
 > [!WARNING]
@@ -121,7 +145,7 @@ Sidecast starts at login from then on and reconnects whenever the cable is plugg
 > upload the newer zip, then switch STREAM off and on so the KVM loads the newer shim.
 
 On the Mac, open the newer DMG from the KVM's disk, or download it from the `Clients` release, and replace
-the app.
+the app. On Windows, run the newer installer from either place: it updates Sidecast in place.
 
 ## The Mac app
 
@@ -152,11 +176,21 @@ picks them up:
 
 </details>
 
+## The Windows app
+
+Sidecast's icon in the notification area opens a flyout: the same status light, the display to stream,
+**Start with Windows**, and **Quit**. The display you pick is the primary while Sidecast runs, and it stays the
+primary if Windows rearranges the displays (a monitor plugged in, or a change in Settings). Quit, or uninstall,
+and Windows goes back to your own layout.
+
 <details>
 <summary><b>Uninstall</b></summary>
 
 On the Mac, run `Sidecast.app/Contents/Resources/Uninstall.command` (right-click the app, **Show Package
 Contents**) or `Sidecast --uninstall`, then move the app to the Trash.
+
+On Windows, uninstall Sidecast under **Settings > Apps > Installed apps**. It puts your own display layout
+back and removes its settings.
 
 On the KVM, switch STREAM off, then remove Sidecast under **Settings > Apps**.
 
@@ -176,23 +210,25 @@ Host screen ─capture + encode─▶ USB network link ──▶ Sidecast shim i
 - **The device app** (`app/sidecast/`) is the touchscreen app above. It switches the shim on and off and
   serves the installer disk to the computer over USB.
 - **A client** on the computer captures a display, encodes it and streams it. The Mac app uses the Mac's
-  hardware encoder and ships signed and notarized; anything that follows [the protocol](docs/protocol.md)
-  works the same way.
+  hardware encoder and ships signed and notarized; the Windows app uses the PC's hardware encoder through
+  Media Foundation. Anything that follows [the protocol](docs/protocol.md) works the same way.
 
 ## Limits
 
 - The computer must be booted, logged in and running a client. This is remote desktop through the KVM's
   own pipeline, not out-of-band access; the KVM's USB-C capture still covers other machines.
 - No audio. The link is USB 2.0, so only encoded video crosses it.
-- The ready-made client is the Mac app, for Apple silicon. Other systems need a client built on the
-  protocol; the ffmpeg recipe is the quickest start.
+- The ready-made clients are the Mac app, for Apple silicon, and the Windows app, for x64 and Arm. Other
+  systems need a client built on the protocol; the ffmpeg recipe is the quickest start.
+- On Windows, the KVM's mouse reaches only the primary display, so the streamed display is the primary while
+  Sidecast runs, and the pointer cannot follow you to another display as it does on the Mac.
 - Supported on the NanoKVM Go and Go+, one `nanokvm-go` version per release.
 
 ## Write a client
 
 The protocol is small and open: one TCP connection, plain-text control lines from the KVM, an Annex-B
 video stream from the host. [docs/protocol.md](docs/protocol.md) has everything needed, including an ffmpeg
-recipe for a quick Linux or Windows client.
+recipe for a quick Linux client.
 
 ## Releases
 
@@ -235,6 +271,6 @@ carries every installer of the client release named in `version.toml` on its ins
 
 ## License
 
-The shim, the device app and the protocol in this repository are [MIT licensed](LICENSE). The Mac app, on
-the KVM's installer disk and in the `Clients` releases, is a separate closed-source binary: free to use and
-to redistribute unmodified.
+The shim, the device app and the protocol in this repository are [MIT licensed](LICENSE). The Mac and
+Windows apps, on the KVM's installer disk and in the `Clients` releases, are separate closed-source binaries:
+free to use and to redistribute unmodified.

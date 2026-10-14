@@ -1,10 +1,22 @@
 # Changelog
 
 Changes to Sidecast for NanoKVM: the shim and the device app. Each version names the `nanokvm-go` version
-it supports; Sidecast refuses to switch on under any other. Releases of the Mac app (`client-v*`) list their
-own changes.
+it supports; Sidecast refuses to switch on under any other. Releases of the Mac and Windows apps (`client-v*`)
+list their own changes.
 
 ## [Unreleased]
+
+### Added
+
+- Installer disk: carries every installer of the client release it names, now the Windows app (x64 and Arm)
+  beside the Mac app.
+
+### Changed
+
+- Device app: its status check, every 2 seconds while the app is open, costs about 2 ms of the KVM's CPU
+  instead of about 60.
+- Device app: switching STREAM on puts the shim in place without rewriting the file the running server has
+  loaded.
 
 ### Fixed
 
