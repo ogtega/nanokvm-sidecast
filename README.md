@@ -118,7 +118,7 @@ One switch, one status line, and a button when there is something to do.
    new USB accessory. The disk holds one installer per platform: open `Sidecast-<version>-macos-arm64.dmg`.
 5. Drag Sidecast to Applications and open it. Allow Screen Recording when asked.
 
-   <img src="docs/images/installer.png" width="600" alt="The Sidecast installer window: drag Sidecast to Applications">
+   <img src="docs/images/installer.png" width="760" alt="The Sidecast installer window: drag Sidecast to Applications">
 
 6. Tap **EJECT DISK** on the KVM. Within a minute the KVM's web UI shows your Mac.
 
