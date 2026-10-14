@@ -184,6 +184,10 @@ Sidecast's icon in the notification area opens a flyout: the same status light, 
 primary if Windows rearranges the displays (a monitor plugged in, or a change in Settings). Quit, or uninstall,
 and Windows goes back to your own layout.
 
+<p align="center">
+  <img src="docs/images/windows-flyout.png" width="360" alt="The Sidecast flyout on Windows: streaming H.265 at 2560 by 1440, display M34WQV, Start with Windows on">
+</p>
+
 <details>
 <summary><b>Uninstall</b></summary>
 
