@@ -28,8 +28,8 @@ notarized Mac app and a Windows app; on Linux, a few lines around ffmpeg will do
 
 ## Requirements
 
-| Part | Requirement |
-|---|---|
+| Component | Requirement |
+|:---|:---|
 | KVM | NanoKVM Go or Go+ running the `nanokvm-go` version named in the release (today: 0.2.2) |
 | Mac app | Apple silicon, macOS 13 or later |
 | Windows app | x64 or Arm, Windows 10 version 2004 or later, a hardware H.264 or H.265 encoder |
@@ -76,6 +76,7 @@ One switch, one status line, and a button when there is something to do.
   <sub>Recorded from the panel: switching STREAM on, installing the client from the KVM's disk, and the computer connecting.</sub>
 </p>
 
+<div align="center">
 <table>
   <tr>
     <td align="center"><img src="docs/images/panel-A-off.png" width="284" alt="Sidecast on the KVM, switched off"></td>
@@ -94,6 +95,7 @@ One switch, one status line, and a button when there is something to do.
     <td align="center"><sub>Streaming, with the KVM's current settings</sub></td>
   </tr>
 </table>
+</div>
 
 ## Get started
 
@@ -167,7 +169,7 @@ picks them up:
 ```
 
 | Option | Effect | Default |
-|---|---|---|
+|:---|:---|:---|
 | `--sck` / `--no-sck` | capture through ScreenCaptureKit: about a fifth of the CPU, but macOS shows its recording indicator | `--no-sck` |
 | `--follow` / `--no-follow` | Follow Pointer on or off | `--no-follow` |
 | `--display main\|<name>` | display to stream (`--list` prints the names) | `main` |
@@ -233,7 +235,7 @@ recipe for a quick Linux client.
 ## Releases
 
 | Release | Tag | Asset |
-|---|---|---|
+|:---|:---|:---|
 | Device app and shim | `vX.Y.Z` | `Sidecast-vX.Y.Z-nanokvm.zip` |
 | Clients | `client-vX.Y.Z` | `Sidecast-vX.Y.Z-macos-arm64.dmg`, `Sidecast-vX.Y.Z-windows-arm64.exe`, `Sidecast-vX.Y.Z-windows-x64.exe` |
 
