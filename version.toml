@@ -1,5 +1,5 @@
 # Versions this repository builds and supports. Bump them in a commit (with a CHANGELOG.md section), then tag
 # v<sidecast>; CI refuses a tag that does not match. Keep flat `key = "value"` lines: build.sh reads them with sed.
-sidecast = "0.3.0"     # the device app and shim
+sidecast = "0.4.0"     # the device app and shim
 nanokvm_go = "0.2.2"   # nanokvm-go package the shim is built and tested against; the app refuses any other
-client = "0.3.0"       # client release (client-v<client>) put on the installer disk
+client = "0.4.0"       # client release (client-v<client>) put on the installer disk

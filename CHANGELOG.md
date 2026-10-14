@@ -4,7 +4,10 @@ Changes to Sidecast for NanoKVM: the shim and the device app. Each version names
 it supports; Sidecast refuses to switch on under any other. Releases of the Mac and Windows apps (`client-v*`)
 list their own changes.
 
-## [Unreleased]
+## [0.4.0] - 2026-10-14
+
+Requires `nanokvm-go` 0.2.2 on the NanoKVM Go or Go+. The installer disk carries Sidecast for Mac and Windows
+0.4.0.
 
 ### Added
 
