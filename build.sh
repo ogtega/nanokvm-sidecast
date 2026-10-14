@@ -3,10 +3,10 @@
 # host, and app.json's version and nanokvm_go from version.toml. Anything but the clean commit tagged v<sidecast>
 # gets the commit added (0.3.0+1a2b3c4, .dirty with uncommitted changes), so a dev build never claims a release.
 # Usage: ./build.sh [deploy <kvm-host>]
-# The disk, clients.iso, holds one installer per host platform, Sidecast-<version>-<platform>.<ext>.
-# Today that is the Mac client's DMG: release client-v<client> from version.toml, or
-# SIDECAST_CLIENT_MACOS_DMG=<path> for a local client build. Needs xorriso, or hdiutil on a Mac. Build the
-# shim first (see README).
+# The disk, clients.iso, holds one installer per host platform, Sidecast-v<version>-<platform>.<ext>: every one in
+# release client-v<client> from version.toml (macos-arm64.dmg, windows-arm64.exe, windows-x64.exe), or every one
+# in SIDECAST_CLIENTS=<dir> for local client builds (the client repository's build/). Needs xorriso, or hdiutil
+# on a Mac. Build the shim first (see README).
 set -euo pipefail
 cd "$(dirname "$0")"
 DEVICE=build/sidecast; REPO=ogtega/nanokvm-sidecast
@@ -23,13 +23,15 @@ python3 -c 'import json, sys; p = sys.argv[1]; d = json.load(open(p)); d.update(
 echo "app version: $APP_VERSION (nanokvm-go $NANOKVM_GO)"
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 mkdir "$T/disk"
-if [ -n "${SIDECAST_CLIENT_MACOS_DMG:-}" ]; then
-  cp "$SIDECAST_CLIENT_MACOS_DMG" "$T/disk/"   # keeps its name: client builds already follow the naming
+if [ -n "${SIDECAST_CLIENTS:-}" ]; then
+  find "$SIDECAST_CLIENTS" -maxdepth 1 -type f -name 'Sidecast-v*-*' -exec cp {} "$T/disk/" \;   # client builds already follow the naming
 else
-  A=Sidecast-v$CLIENT-macos-arm64.dmg
-  curl -fsSL -o "$T/disk/$A" "https://github.com/$REPO/releases/download/client-v$CLIENT/$A" ||
-    { echo "no $A in release client-v$CLIENT"; exit 1; }
+  # The client release is published whole (its CI uploads every platform at once), so take all of its installers.
+  curl -fsSL ${GH_TOKEN:+-H "Authorization: Bearer $GH_TOKEN"} "https://api.github.com/repos/$REPO/releases/tags/client-v$CLIENT" | python3 -c \
+    'import json, sys; [print(a["browser_download_url"]) for a in json.load(sys.stdin)["assets"] if a["name"].startswith(sys.argv[1])]' \
+    "Sidecast-v$CLIENT-" | (cd "$T/disk" && xargs -n 1 curl -fsSLO)
 fi
+[ -n "$(ls "$T/disk")" ] || { echo "no client installers (release client-v$CLIENT, or SIDECAST_CLIENTS)"; exit 1; }
 echo "installer disk: $(ls "$T/disk" | tr '\n' ' ')"
 if command -v xorriso >/dev/null; then
   xorriso -as mkisofs -quiet -V Sidecast -J -R -o "$DEVICE/clients.iso" "$T/disk"

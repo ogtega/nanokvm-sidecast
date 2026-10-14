@@ -199,10 +199,10 @@ recipe for a quick Linux or Windows client.
 | Release | Tag | Asset |
 |---|---|---|
 | Device app and shim | `vX.Y.Z` | `Sidecast-vX.Y.Z-nanokvm.zip` |
-| Clients | `client-vX.Y.Z` | `Sidecast-vX.Y.Z-macos-arm64.dmg` |
+| Clients | `client-vX.Y.Z` | `Sidecast-vX.Y.Z-macos-arm64.dmg`, `Sidecast-vX.Y.Z-windows-arm64.exe`, `Sidecast-vX.Y.Z-windows-x64.exe` |
 
 Each device app release names the `nanokvm-go` version it supports in the first line of its notes, and
-carries the client release named in `version.toml` on its installer disk. Changes are listed in
+carries every installer of the client release named in `version.toml` on its installer disk. Changes are listed in
 [CHANGELOG.md](CHANGELOG.md).
 
 <details>
@@ -223,8 +223,8 @@ carries the client release named in `version.toml` on its installer disk. Change
 
 - **Device app:** `./build.sh [deploy <kvm-host>]` assembles `build/sidecast` and, with `deploy`, copies it
   to `/kvmcomm/apps/` over ssh. Versions come from `version.toml`: the app's, the supported `nanokvm-go`,
-  and the client release it puts on the installer disk (`SIDECAST_CLIENT_MACOS_DMG=<path>` uses a local
-  client build instead). Builds other than the tagged release add the commit to the version. Needs
+  and the client release whose installers it puts on the installer disk (`SIDECAST_CLIENTS=<dir>` takes every
+  `Sidecast-v*` installer in a folder instead, such as a client build's `build/`). Builds other than the tagged release add the commit to the version. Needs
   `xorriso`, or `hdiutil` on a Mac.
 - **Preview** the device app without hardware: `app/render-states.py <appbase dir> app/sidecast <out dir>`.
   The SDK's `appbase.py` is on the KVM at `/kvmcomm/apps/`; copy it to `dev/appbase/` (never committed).

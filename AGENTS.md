@@ -15,9 +15,10 @@ real hardware.
 | `version.toml` | pinned versions: the device app, the supported `nanokvm-go`, the client release on the installer disk |
 | `build.sh` | assembles the device app in `build/sidecast` (versions from `version.toml`, shim, installer disk); `deploy <host>` copies it to the KVM |
 
-Clients are built in a separate repository and arrive here only as signed installers in releases
-`client-vX.Y.Z`, e.g. `Sidecast-vX.Y.Z-macos-arm64.dmg`. `build.sh` puts the one `version.toml` pins on
-`clients.iso`, the installer disk the device app serves; the host's user opens the one for their platform.
+Clients are built in a separate repository and arrive here only as installers in releases `client-vX.Y.Z`:
+`Sidecast-vX.Y.Z-macos-arm64.dmg`, `Sidecast-vX.Y.Z-windows-arm64.exe`, `Sidecast-vX.Y.Z-windows-x64.exe`.
+`build.sh` puts every installer of the release `version.toml` pins on `clients.iso`, the installer disk the device
+app serves; the host's user opens the one for their platform.
 Client releases are independent of releases here. Pushes to main and pull requests only run the checks in
 `.github/workflows/`.
 
