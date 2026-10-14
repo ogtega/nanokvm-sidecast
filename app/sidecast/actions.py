@@ -85,13 +85,13 @@ def wait_for_host(timeout=3.0):
 
 # ---- Mac client link
 def link_state():
-    """A client holds the shim's port 5555: an established connection in the kernel's TCP tables (ss forks, ~30 ms)."""
-    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
-        try:
-            for row in open(table).read().splitlines()[1:]:
-                local, state = row.split()[1], row.split()[3]
-                if local.endswith(":15B3") and state == "01": return True   # 5555 in hex; 01 = ESTABLISHED
-        except OSError: pass
+    """A client holds the shim's port 5555: an established connection in the kernel's IPv4 TCP table (the shim listens
+    on IPv4 only; ss forks, ~30 ms)."""
+    try:
+        for row in open("/proc/net/tcp").read().splitlines()[1:]:
+            local, state = row.split()[1], row.split()[3]
+            if local.endswith(":15B3") and state == "01": return True   # 5555 in hex; 01 = ESTABLISHED
+    except OSError: pass
     return False
 
 def host_settings():

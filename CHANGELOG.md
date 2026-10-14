@@ -8,8 +8,8 @@ list their own changes.
 
 ### Security
 
-- Shim: accepts a stream only from the computer on the USB cable (and the KVM itself). It used to accept one from
-  any network the KVM is on, so anyone on the same LAN or VPN could replace the video viewers see.
+- Shim: accepts a stream only from the computer on the USB cable. It used to accept one from any network the KVM
+  is on, so anyone on the same LAN or VPN could replace the video viewers see.
 
 ## [0.4.0] - 2026-10-14
 

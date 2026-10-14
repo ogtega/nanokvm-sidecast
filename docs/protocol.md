@@ -7,8 +7,8 @@ for any platform; the Sidecast apps for Mac and Windows are two implementations.
 ## Transport
 
 - One TCP connection from the host to the KVM, port 5555, over the USB cable: the KVM is `10.136.177.1` on the
-  USB network interface. The shim accepts streams only from that network (`10.136.177.0/24`) and from the KVM
-  itself; connections arriving over Wi-Fi, Ethernet or a VPN are closed unread.
+  USB network interface, over IPv4. The shim accepts streams only from that network (`10.136.177.0/24`);
+  connections arriving over Wi-Fi, Ethernet or a VPN are closed unread.
 - The client sends only the video byte stream. The KVM sends only text control lines. Both directions
   share the one socket.
 - A newer connection replaces the current one: the shim accepts it and drops the old stream. Use this to

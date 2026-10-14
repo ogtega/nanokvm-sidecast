@@ -274,13 +274,10 @@ static int send_control(int fd, int full) {
   return 0;
 }
 
-// Only the computer on the USB cable may stream: the KVM's USB network is 10.136.177.0/24 (the KVM is .1), plus
-// loopback for processes on the KVM itself. The port is reachable from every interface (Wi-Fi, Ethernet, Tailscale);
-// those connections are closed unread. A spoofed USB source cannot connect from elsewhere: the replies leave on usb0.
-static int usb_peer(struct in_addr a) {
-  uint32_t ip = ntohl(a.s_addr);
-  return (ip >> 8) == 0x0A88B1 /* 10.136.177 */ || (ip >> 24) == 127;
-}
+// Only the computer on the USB cable may stream: the KVM's USB network is 10.136.177.0/24 (the KVM is .1). The port is
+// reachable from every interface (Wi-Fi, Ethernet, Tailscale); those connections are closed unread. A spoofed USB
+// source cannot connect from elsewhere: the replies leave on usb0. The socket is IPv4 only, so no IPv6 peer arrives.
+static int usb_peer(struct in_addr a) { return (ntohl(a.s_addr) >> 8) == 0x0A88B1; /* 10.136.177 */ }
 
 static int accept_usb(int ls) {  // -1 when nothing acceptable arrived
   struct sockaddr_in p; socklen_t n = sizeof p;
