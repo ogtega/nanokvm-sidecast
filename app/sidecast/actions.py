@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Device-side actions for Sidecast. No framebuffer dependency so it can be driven from ssh:
    python3 actions.py status|shim-on|shim-off|attach|detach"""
-import json, os, shutil, subprocess, sys, time
+import functools, json, os, shutil, subprocess, sys, time
 from pathlib import Path
 
 APP = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +24,7 @@ def shim_on_state():
     try: return os.readlink(LINK) == "libkvm.so.shim"
     except OSError: return False
 
+@functools.lru_cache(maxsize=None)   # a fork of dpkg-query costs ~20 ms; the package cannot change under a running app
 def kvm_version():
     out = subprocess.run(["dpkg-query", "-W", "-f=${Version}", "nanokvm-go"], capture_output=True, text=True)
     return out.stdout.strip() or "unknown"
@@ -81,8 +82,14 @@ def wait_for_host(timeout=3.0):
 
 # ---- Mac client link
 def link_state():
-    out = subprocess.run(["ss", "-tn", "state", "established", "( sport = :5555 )"], capture_output=True, text=True).stdout
-    return len(out.strip().splitlines()) > 1
+    """A client holds the shim's port 5555: an established connection in the kernel's TCP tables (ss forks, ~30 ms)."""
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            for row in open(table).read().splitlines()[1:]:
+                local, state = row.split()[1], row.split()[3]
+                if local.endswith(":15B3") and state == "01": return True   # 5555 in hex; 01 = ESTABLISHED
+        except OSError: pass
+    return False
 
 def host_settings():
     """Codec, bitrate and fps the server currently asks for (what the host client is encoding)."""
