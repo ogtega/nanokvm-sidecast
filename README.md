@@ -130,13 +130,12 @@ Sidecast starts at login from then on and reconnects whenever the cable is plugg
    per platform: open `Sidecast-<version>-windows-x64.exe`, or `-windows-arm64.exe` on an Arm PC
    (**Settings > System > About** shows which under **System type**).
 5. The installer needs no administrator rights and starts Sidecast in the notification area when it finishes.
-
-   > [!NOTE]
-   > The Windows app is not signed yet. If Windows says it protected your PC, choose **More info**, then
-   > **Run anyway**.
-
 6. Tap **EJECT DISK** on the KVM, then pick the display to stream from Sidecast's icon. Within a minute the
    KVM's web UI shows it.
+
+> [!NOTE]
+> The Windows app is not signed yet. If Windows says it protected your PC when you open the installer, choose
+> **More info**, then **Run anyway**.
 
 Sidecast starts with Windows from then on and reconnects whenever the cable is plugged in.
 
