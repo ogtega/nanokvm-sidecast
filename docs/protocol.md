@@ -56,11 +56,14 @@ Requirements, in order of how badly things go wrong without them:
    a stream that sends them once would work, but sending them with every keyframe is the safe form.
    The browser's decoder discards everything before the first keyframe it sees.
 3. **An access-unit delimiter after every frame.** H.264: NAL type 9, bytes `09 F0`. H.265: NAL type 35,
-   bytes `46 01 50`. The shim completes a NAL only when the next start code arrives; the delimiter makes
-   every frame deliverable immediately. Without it the last frame waits for a 200 ms idle flush, and a
+   bytes `46 01 50`. The shim completes a NAL only when the next start code arrives, and a picture when the
+   delimiter starts; the delimiter makes every frame deliverable immediately. Without it the last frame waits for a 200 ms idle flush, and a
    large keyframe split across USB packets can be flushed mid-frame.
 4. **Keyframe interval equal to `gop`**, and a keyframe promptly after `idr`.
-5. **One slice per keyframe.** Multi-slice IDRs work but get the parameter sets prepended to each slice.
+5. **Any slicing.** The browser takes each sample as a whole picture, so the shim groups a picture's slices
+   into one sample, parameter sets once per keyframe. A picture ends at the delimiter, at any other NAL that
+   is not a slice, or at the next picture's first slice. Hardware encoders often slice (Qualcomm's HEVC
+   encoder always makes 4 per picture); one slice per picture is still the cheapest form.
 6. **NAL units under 1 MiB.** Larger ones are dropped.
 
 The shim drops SEI and other non-VCL NALs, so sending them is harmless. It detects the codec from the

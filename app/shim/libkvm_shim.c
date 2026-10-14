@@ -34,6 +34,7 @@
 #define IMG_NOT_EXIST -1
 #define QCAP 256          // ponytail: fixed ring, drop-oldest when full
 #define RDBUF (1 << 20)
+#define PIC_MAX (4 << 20)  // one picture's slices; a runaway picture is cut here
 #define PAUSE_AFTER_S 15  // no frame reads for this long = no viewers -> "pause"; the first read after that -> "resume".
                           // Also the connect dump's rule. A server loop stops reading while a slow viewer blocks its
                           // websocket write, so keep this well above such stalls.
@@ -84,6 +85,7 @@ typedef struct { uint8_t *p; uint32_t n; int code; } nal_t;  // code = libkvm re
 static nal_t ring[QCAP];      // entries live until overwritten QCAP pushes later; readers hold no copies
 static uint64_t seq_next;     // sequence number of the next push; ring holds [seq_next-QCAP, seq_next)
 static nal_t vps, sps, pps;   // cached parameter sets
+static nal_t pic;             // the picture being assembled: one sample per picture, whatever the encoder's slicing
 static int hevc;              // codec of the incoming stream, detected from its parameter sets
 static int net_connected;     // a client stream is attached: serve from the ring
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
@@ -103,13 +105,6 @@ static double last_read;  // seconds, now_s() clock: last viewer frame read. "pa
 enum { C_P = 0, C_KEY, C_SPS, C_PPS, C_VPS };
 static const int base_code[] = { 4, 3, 1, 2 };  // C_P, C_KEY, C_SPS, C_PPS -> H.264 codes; +4 for H.265
 
-static nal_t dup_nal(const uint8_t *d, uint32_t n) {
-  nal_t x = { malloc(n + 4), n + 4, 0 };
-  memcpy(x.p, "\0\0\0\1", 4);
-  memcpy(x.p + 4, d, n);
-  return x;
-}
-
 static void push_locked(nal_t x) {
   nal_t *slot = &ring[seq_next % QCAP];
   free(slot->p);
@@ -120,6 +115,7 @@ static void push_locked(nal_t x) {
 
 static void drain_locked(void) {
   for (int i = 0; i < QCAP; i++) { free(ring[i].p); ring[i].p = NULL; }
+  free(pic.p); pic = (nal_t){0};
   for (int i = 0; i < 2; i++) cons[i].next = seq_next;
 }
 
@@ -141,25 +137,49 @@ static int cursor_locked(uint8_t type) {
   return i;
 }
 
+static int nal_type(uint8_t h) { return hevc ? (h >> 1) & 0x3f : h & 0x1f; }
+
 // Classify a NAL by its header byte; -1 = drop (AUD, SEI, other non-VCL).
 static int nal_class(const uint8_t *d) {
+  int t = nal_type(d[0]);
   if (hevc) {
-    int t = (d[0] >> 1) & 0x3f;
     switch (t) { case 32: return C_VPS; case 33: return C_SPS; case 34: return C_PPS; }
     if (t >= 16 && t <= 21) return C_KEY;   // BLA/IDR/CRA
     return t < 32 ? C_P : -1;
   }
-  int t = d[0] & 0x1f;
   switch (t) { case 7: return C_SPS; case 8: return C_PPS; case 5: return C_KEY; }
   return (t >= 1 && t <= 4) ? C_P : -1;
 }
 
+// Appends [start code]NAL to x with one reallocation.
+static void append(nal_t *x, const uint8_t *d, uint32_t n, int start_code) {
+  x->p = realloc(x->p, x->n + n + (start_code ? 4 : 0));
+  if (start_code) { memcpy(x->p + x->n, "\0\0\0\1", 4); x->n += 4; }
+  memcpy(x->p + x->n, d, n);
+  x->n += n;
+}
+
+// The assembled picture becomes one sample. Pushing is the only step that takes the lock: pic and the
+// parameter-set caches belong to the feed thread (connect and disconnect reset them on that same thread).
+static void flush_pic(void) {
+  if (!pic.p) return;
+  pthread_mutex_lock(&mu);
+  push_locked(pic);
+  pthread_mutex_unlock(&mu);
+  pic = (nal_t){0};
+}
+
+// First slice of a picture: HEVC first_slice_segment_in_pic_flag, H.264 first_mb_in_slice == 0 (ue(v) 0 is a lone 1 bit).
+static int first_slice(const uint8_t *d, uint32_t n) { return hevc ? n > 2 && (d[2] & 0x80) : n > 1 && (d[1] & 0x80); }
+static int is_aud(uint8_t h) { return nal_type(h) == (hevc ? 35 : 9); }
+
 // d/n = one NAL without start code.
-// Parameter sets are cached, never emitted on their own: the browser's direct-mode decoder only
-// starts on a keyframe message and drops everything before it, so each keyframe sample is
-// self-contained: [VPS][SPS][PPS][IDR]. WebRTC's packetizer splits the sample on start codes.
-// ponytail: assumes one slice per keyframe (true for VideoToolbox); multi-slice IDRs would get the
-// parameter sets prepended to every slice.
+// One sample per picture: encoders that slice (Qualcomm's HEVC makes 4 per picture) would otherwise hand the
+// browser one fragment per frame message, which decodes to black. Slices collect in pic until the picture ends:
+// the client's access-unit delimiter (caught early in feed()), any other non-slice NAL, or the next picture's
+// first slice. Parameter sets are cached, never emitted on their own: the browser's direct-mode decoder only
+// starts on a keyframe message and drops everything before it, so each keyframe sample is self-contained:
+// [VPS][SPS][PPS][IDR slices]. WebRTC's packetizer splits the sample on start codes.
 static void on_nal(const uint8_t *d, uint32_t n) {
   if (n == 0) return;
   // Codec detection from parameter sets. HEVC headers are two bytes with the second always 0x01 for
@@ -167,27 +187,25 @@ static void on_nal(const uint8_t *d, uint32_t n) {
   if (n >= 2 && d[0] == 0x40 && d[1] == 0x01) hevc = 1;              // HEVC VPS
   else if (n >= 2 && (d[0] & 0x9f) == 0x07 && d[1] != 0x01) hevc = 0; // H.264 SPS: 0x27 (VideoToolbox), 0x47, 0x67 (x264)
   int c = nal_class(d);
-  if (c < 0) return;
-  pthread_mutex_lock(&mu);
-  nal_t x = dup_nal(d, n);
-  x.code = base_code[c] + (hevc ? 4 : 0);
-  if (c == C_VPS) { free(vps.p); vps = x; }
-  else if (c == C_SPS) { free(sps.p); sps = x; }
-  else if (c == C_PPS) { free(pps.p); pps = x; }
-  else {
-    if (c == C_KEY && sps.p && pps.p) {
-      nal_t v = hevc ? vps : (nal_t){0};
-      nal_t b = { malloc(v.n + sps.n + pps.n + x.n), v.n + sps.n + pps.n + x.n, x.code };
-      uint8_t *w = b.p;
-      if (v.p) { memcpy(w, v.p, v.n); w += v.n; }
-      memcpy(w, sps.p, sps.n); w += sps.n;
-      memcpy(w, pps.p, pps.n); w += pps.n;
-      memcpy(w, x.p, x.n);
-      free(x.p); x = b;
-    }
-    push_locked(x);
+  if ((c != C_P && c != C_KEY) || first_slice(d, n)) flush_pic();
+  if (c == C_VPS || c == C_SPS || c == C_PPS) {
+    nal_t *cache = c == C_VPS ? &vps : c == C_SPS ? &sps : &pps;
+    free(cache->p);
+    *cache = (nal_t){0};
+    append(cache, d, n, 1);
+  } else if (c >= 0) {
+    int code = base_code[c] + (hevc ? 4 : 0);
+    if (!pic.p) {
+      pic.code = code;
+      if (c == C_KEY && sps.p && pps.p) {
+        if (hevc && vps.p) append(&pic, vps.p, vps.n, 0);
+        append(&pic, sps.p, sps.n, 0);
+        append(&pic, pps.p, pps.n, 0);
+      }
+    } else if (c == C_KEY) pic.code = code;
+    append(&pic, d, n, 1);
+    if (pic.n > PIC_MAX) flush_pic();
   }
-  pthread_mutex_unlock(&mu);
 }
 
 // Emit the retained tail ("00 00 01" + partial NAL) as a complete NAL.
@@ -198,6 +216,7 @@ static void flush_tail(uint8_t *buf, size_t *len, const char *why) {
     on_nal(buf + 3, end - 3);
   }
   *len = 0;
+  flush_pic();  // nothing more is coming for now: the picture is as complete as it will get
 }
 
 // ---------------------------------------------------------------- kvm_vin.toml -> ctl
@@ -293,6 +312,7 @@ static int feed(int fd, int ls) {  // returns a newly accepted fd to switch to, 
           size_t end = i; if (end > start && buf[end - 1] == 0) end--;  // 4-byte start code
           on_nal(buf + start, end - start);
         }
+        if (i + 3 < len && is_aud(buf[i + 3])) flush_pic();  // the delimiter's start: the picture is complete now, not when the delimiter is
         i += 3; start = i; have_start = 1;
       } else i++;
     }

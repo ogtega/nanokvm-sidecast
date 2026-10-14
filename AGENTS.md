@@ -40,6 +40,10 @@ Client releases are independent of releases here. Pushes to main and pull reques
 - Per-caller state is keyed by requested type (1 = H.264, 5 = H.265), never by thread id. Go runs a
   goroutine's cgo calls on varying OS threads.
 - H.264 SPS detection is by NAL type, not header byte: VideoToolbox emits `0x27`, x264 `0x67`.
+- One sample per picture: the browser takes every sample as a whole frame, so a picture sent as several slices
+  (Qualcomm's HEVC encoder always makes 4) decodes to black unless the shim groups them. A picture ends at the
+  client's delimiter (caught when its start code arrives), any other non-slice NAL, or the next first slice. Only
+  pushing a finished picture takes the lock: the picture buffer and parameter-set caches belong to the feed thread.
 - Frames end with an access-unit delimiter from the client. The idle flush is a 200 ms fallback only; a
   short idle timeout splits large keyframes on the USB 2.0 link.
 - Never SIGPIPE the server: all socket writes use `MSG_NOSIGNAL`. A newer client replaces the current
