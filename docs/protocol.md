@@ -1,8 +1,8 @@
 # Sidecast client protocol
 
 How a host feeds its screen to a NanoKVM Go or Go+ through the Sidecast shim. This is enough to write a client
-for any platform; the Sidecast Mac client is one implementation. The shim in `app/shim/libkvm_shim.c` is the
-authority when this document and the code disagree.
+for any platform; the Sidecast apps for Mac and Windows are two implementations. The shim in
+`app/shim/libkvm_shim.c` is the authority when this document and the code disagree.
 
 ## Transport
 
@@ -57,13 +57,14 @@ Requirements, in order of how badly things go wrong without them:
    The browser's decoder discards everything before the first keyframe it sees.
 3. **An access-unit delimiter after every frame.** H.264: NAL type 9, bytes `09 F0`. H.265: NAL type 35,
    bytes `46 01 50`. The shim completes a NAL only when the next start code arrives, and a picture when the
-   delimiter starts; the delimiter makes every frame deliverable immediately. Without it the last frame waits for a 200 ms idle flush, and a
-   large keyframe split across USB packets can be flushed mid-frame.
+   delimiter starts; the delimiter makes every frame deliverable immediately. Without it the last frame waits
+   for a 200 ms idle flush, and a large keyframe split across USB packets can be flushed mid-frame.
 4. **Keyframe interval equal to `gop`**, and a keyframe promptly after `idr`.
 5. **Any slicing.** The browser takes each sample as a whole picture, so the shim groups a picture's slices
    into one sample, parameter sets once per keyframe. A picture ends at the delimiter, at any other NAL that
-   is not a slice, or at the next picture's first slice. Hardware encoders often slice (Qualcomm's HEVC
-   encoder always makes 4 per picture); one slice per picture is still the cheapest form.
+   is not a slice, or at the next picture's first slice. Many encoders slice: Qualcomm's HEVC encoder always
+   makes 4 per picture, libx264 with `-tune zerolatency` about one per thread. One slice per picture is still
+   the cheapest form.
 6. **NAL units under 1 MiB.** Larger ones are dropped.
 
 The shim drops SEI and other non-VCL NALs, so sending them is harmless. It detects the codec from the
@@ -71,8 +72,8 @@ parameter sets, not from what it asked for, and serves whatever is flowing: a cl
 late or never does not break the pipeline, it only mismatches what the viewer expects until it catches up.
 
 Resolution, profile and pixel format are the client's choice. H.264 Main or High and H.265 Main at the
-display's native size, or scaled to a width of 2560, decode fine in the KVM's browser viewer. The Mac client
-captures at native resolution, scales to a target width, and uses 4:2:0 limited range.
+display's native size, or scaled to a width of 2560, decode fine in the KVM's browser viewer. The Sidecast
+apps capture at native resolution, scale to a target width, and use 4:2:0 limited range.
 
 ## Lifecycle
 
@@ -86,7 +87,7 @@ on socket error or EOF: stop capture, close, wait 1-2 s, reconnect
 
 The client needs no state across connections: the KVM resends the full state on every connect.
 
-## Quickest implementation on Linux or Windows
+## Quickest implementation with ffmpeg
 
 ffmpeg already produces a conforming stream, including the access-unit delimiters, and can write straight
 to the socket. What it cannot do is react to control lines, so a small wrapper must own the socket, read the
@@ -94,20 +95,39 @@ lines, and restart ffmpeg with new arguments when `codec`, `fps`, `bitrate` or `
 `pause` and starting it on `resume`. `idr` cannot be honoured by ffmpeg mid-run; viewers will wait for the next
 keyframe, which is at most `gop` frames away.
 
-Encoding arguments that produce a conforming stream, with `-f h264` or `-f hevc` and the encoder of the
-platform in place of the VideoToolbox ones:
+On Linux with an Xorg session and the software encoder, this produces a conforming H.264 stream on stdout:
 
 ```
 ffmpeg -hide_banner -loglevel error -nostdin \
-  <capture input: x11grab, kmsgrab, gdigrab, ddagrab...> -framerate FPS \
-  -vf scale=2560:-2 -fps_mode passthrough \
-  -c:v h264_<encoder> -profile:v main -bsf:v h264_metadata=aud=insert \
+  -f x11grab -framerate FPS -i :0 \
+  -vf "scale=2560:-2,format=yuv420p" -fps_mode passthrough \
+  -c:v libx264 -preset veryfast -tune zerolatency -profile:v main -bsf:v h264_metadata=aud=insert \
   -b:v BITRATEk -g GOP -bf 0 -flush_packets 1 -f h264 pipe:1
 ```
 
-For H.265 use `-c:v hevc_<encoder> -bsf:v hevc_metadata=aud=insert -f hevc`. `-bf 0` removes B-frames,
-`-flush_packets 1` sends each frame as soon as it is encoded, and the `aud=insert` filters add the
-access-unit delimiters. Write ffmpeg's stdout to the socket.
+For H.265 use `-c:v libx265 -preset veryfast -tune zerolatency -profile:v main -x265-params open-gop=0
+-bsf:v hevc_metadata=aud=insert -f hevc`. Write ffmpeg's stdout to the socket.
+
+| Argument | Why |
+|---|---|
+| `-framerate FPS` before `-i` | the capture rate is an input option of the grabber |
+| `format=yuv420p` | screen grabs arrive as RGB, which the encoders would keep as 4:4:4; Main profile needs 4:2:0 |
+| `-tune zerolatency`, `-bf 0` | no B-frames and no lookahead delay |
+| `-x265-params open-gop=0` | keyframes are IDR pictures, not CRA |
+| `aud=insert` | the access-unit delimiter after every frame |
+| `-flush_packets 1` | each frame leaves as soon as it is encoded |
+
+Notes:
+
+- `x11grab` captures an Xorg session only; under Wayland it sees nothing but X11 windows. Ubuntu 22.04 and
+  24.04 offer "Ubuntu on Xorg" at the login screen; later releases are Wayland-only, where screen capture goes
+  through the desktop portal (PipeWire), which ffmpeg cannot read. There, use `kmsgrab` (root, with a VA-API
+  pipeline) or a GStreamer `pipewiresrc` pipeline with the same encoder settings.
+- `-fps_mode` needs ffmpeg 5.1 or later (Ubuntu 24.04 ships 6.1). On older versions use `-vsync passthrough`.
+- Hardware encoders (`h264_vaapi`, `h264_nvenc`, `h264_qsv` and their `hevc_` forms) work with the same
+  stream options, but take their own upload filter in place of `format=yuv420p`.
+- On Windows the capture input is `-f gdigrab -framerate FPS -i desktop`; the Sidecast app for Windows is the
+  ready-made client.
 
 ## Versioning
 
