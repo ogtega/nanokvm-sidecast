@@ -6,15 +6,16 @@ for any platform; the Sidecast apps for Mac and Windows are two implementations.
 
 ## Transport
 
-- One TCP connection from the host to the KVM, port 5555. Over the USB cable the KVM is `10.136.177.1`
-  on the USB network interface; any other route to the KVM works too.
+- One TCP connection from the host to the KVM, port 5555, over the USB cable: the KVM is `10.136.177.1` on the
+  USB network interface. The shim accepts streams only from that network (`10.136.177.0/24`) and from the KVM
+  itself; connections arriving over Wi-Fi, Ethernet or a VPN are closed unread.
 - The client sends only the video byte stream. The KVM sends only text control lines. Both directions
   share the one socket.
 - A newer connection replaces the current one: the shim accepts it and drops the old stream. Use this to
   recover from a half-open socket after a USB re-enumeration.
 - The KVM enables TCP keepalive (5 s idle, 5 s interval, 3 probes, so a vanished host is noticed in about
   20 s). Set `TCP_NODELAY` on the client side. On any disconnect, reconnect after a second or two, forever.
-- No authentication. The link is the USB cable.
+- No authentication beyond that: the USB cable is the credential.
 
 ## Control lines, KVM to client
 

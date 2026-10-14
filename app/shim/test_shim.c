@@ -96,6 +96,13 @@ int main(int argc, char **argv) {
   run(argv[3], 0);   // VideoToolbox stream, SPS header 0x27, right after HEVC: codec detection must flip back
   run_sliced(1);     // Qualcomm-style HEVC: 4 slices per picture -> one sample per picture
   run_sliced(0);     // and the same for H.264
+  // only the USB link (and the KVM itself) may stream
+  struct in_addr ip;
+  inet_aton("10.136.177.100", &ip); assert(usb_peer(ip));   // the host's address on the USB network
+  inet_aton("127.0.0.1", &ip);      assert(usb_peer(ip));
+  inet_aton("192.168.86.27", &ip);  assert(!usb_peer(ip));  // Wi-Fi / Ethernet LAN
+  inet_aton("100.101.102.103", &ip); assert(!usb_peer(ip)); // Tailscale
+  inet_aton("10.136.178.1", &ip);   assert(!usb_peer(ip));
   // the requested type does not filter (stock behaviour): H.264 asked while HEVC flows -> HEVC codes
   pthread_mutex_lock(&mu); drain_locked(); pthread_mutex_unlock(&mu);
   feed_file(argv[2]); uint8_t *p; uint32_t n;

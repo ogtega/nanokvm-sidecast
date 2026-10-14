@@ -274,6 +274,23 @@ static int send_control(int fd, int full) {
   return 0;
 }
 
+// Only the computer on the USB cable may stream: the KVM's USB network is 10.136.177.0/24 (the KVM is .1), plus
+// loopback for processes on the KVM itself. The port is reachable from every interface (Wi-Fi, Ethernet, Tailscale);
+// those connections are closed unread. A spoofed USB source cannot connect from elsewhere: the replies leave on usb0.
+static int usb_peer(struct in_addr a) {
+  uint32_t ip = ntohl(a.s_addr);
+  return (ip >> 8) == 0x0A88B1 /* 10.136.177 */ || (ip >> 24) == 127;
+}
+
+static int accept_usb(int ls) {  // -1 when nothing acceptable arrived
+  struct sockaddr_in p; socklen_t n = sizeof p;
+  int fd = accept(ls, (void *)&p, &n);
+  if (fd < 0 || usb_peer(p.sin_addr)) return fd;
+  fprintf(stderr, "libkvm_shim: refused %s: not on the USB link\n", inet_ntoa(p.sin_addr));
+  close(fd);
+  return -1;
+}
+
 // ---------------------------------------------------------------- stream reader
 // Split Annex-B stream on 00 00 01 start codes. A NAL is complete when the next start code arrives;
 // the client inserts access-unit delimiters so every frame is terminated promptly. The idle flush
@@ -290,7 +307,7 @@ static int feed(int fd, int ls) {  // returns a newly accepted fd to switch to, 
     int pr = poll(pf, ls >= 0 ? 2 : 1, idle_ms);
     if (pr < 0) break;
     if (ls >= 0 && (pf[1].revents & POLLIN)) {  // a newer client: the old link is stale after a USB reset
-      next = accept(ls, NULL, NULL);
+      next = accept_usb(ls);
       if (next >= 0) { fprintf(stderr, "libkvm_shim: newer client connected, replacing the current stream\n"); break; }
     }
     pr = pf[0].revents & POLLIN ? 1 : 0;
@@ -346,7 +363,7 @@ static void *server(void *arg) {
   if (bind(ls, (void *)&a, sizeof a) || listen(ls, 1)) { perror("libkvm_shim bind"); return NULL; }
   int fd = -1;
   for (;;) {
-    if (fd < 0) { fd = accept(ls, NULL, NULL); if (fd < 0) continue; }
+    if (fd < 0) { fd = accept_usb(ls); if (fd < 0) continue; }
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
     keepalive(fd);
     fprintf(stderr, "libkvm_shim: stream connected\n");

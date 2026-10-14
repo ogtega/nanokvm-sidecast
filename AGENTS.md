@@ -46,6 +46,9 @@ Client releases are independent of releases here. Pushes to main and pull reques
   pushing a finished picture takes the lock: the picture buffer and parameter-set caches belong to the feed thread.
 - Frames end with an access-unit delimiter from the client. The idle flush is a 200 ms fallback only; a
   short idle timeout splits large keyframes on the USB 2.0 link.
+- Streams are accepted only from the USB network (`10.136.177.0/24`) and loopback: the port listens on every
+  interface (Wi-Fi, Ethernet, Tailscale), so `accept_usb` closes other peers unread. Binding to the USB address
+  instead would fail when usb0 is down as the server starts, and Linux still accepts LAN packets addressed to it.
 - Never SIGPIPE the server: all socket writes use `MSG_NOSIGNAL`. A newer client replaces the current
   one, and TCP keepalive is on, because a USB re-enumeration kills the host side without a FIN.
 - The stock `kvmv_close_video_stream` blocks about three seconds; skip it while a client streams and
