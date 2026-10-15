@@ -229,6 +229,12 @@ Host screen ─capture + encode─▶ USB network link ──▶ Sidecast shim i
   Sidecast runs, and the pointer cannot follow you to another display as it does on the Mac.
 - Supported on the NanoKVM Go and Go+, one `nanokvm-go` version per release.
 
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|:---|:---|
+| The stream cuts in and out every few seconds | A VPN client on the computer is interfering with the USB link to the KVM. ProtonVPN on Windows does this even with Sidecast or the KVM excluded from the tunnel. Disconnect the VPN while you stream. |
+
 ## Write a client
 
 The protocol is small and open: one TCP connection, plain-text control lines from the KVM, an Annex-B
